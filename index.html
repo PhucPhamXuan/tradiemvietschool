@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartGrade K12 - Hệ Thống Tra Cứu</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Icons SVG
+        const Icons = {
+            Search: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+            BarChart2: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>,
+            Upload: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+            Users: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            BookOpen: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
+            Award: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>,
+            Filter: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+            ArrowDown: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><line x1="12" x2="12" y1="5" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
+            AlertCircle: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>,
+            RefreshCw: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        };
+
+        const Card = ({ title, value, subtext, icon: Icon, colorClass }) => (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-start space-x-4 transition-transform hover:-translate-y-1">
+                <div className={`p-3 rounded-lg ${colorClass} bg-opacity-10`}>
+                    <Icon className={`w-6 h-6 ${colorClass.replace('bg-', 'text-')}`} />
+                </div>
+                <div>
+                    <p className="text-sm font-medium text-slate-500">{title}</p>
+                    <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
+                    {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
+                </div>
+            </div>
+        );
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [students, setStudents] = useState([]);
+            const [subjects, setSubjects] = useState([]);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [selectedClass, setSelectedClass] = useState('All');
+            const [loading, setLoading] = useState(true);
+            const [errorMsg, setErrorMsg] = useState('');
+            const [uploadStatus, setUploadStatus] = useState('');
+
+            // Fetch data từ Node.js API
+            useEffect(() => {
+                fetchDataFromServer();
+            }, []);
+
+            const fetchDataFromServer = async () => {
+                setLoading(true);
+                setErrorMsg('');
+                try {
+                    const response = await fetch('/api/data');
+                    const result = await response.json();
+
+                    if (response.ok && !result.error) {
+                        setStudents(result.data);
+                        setSubjects(result.headers);
+                        setLoading(false);
+                        if(result.data.length > 0) setActiveTab('dashboard');
+                    } else {
+                        throw new Error(result.error || "Lỗi tải dữ liệu");
+                    }
+                } catch (err) {
+                    console.error("Lỗi:", err);
+                    setLoading(false);
+                    setErrorMsg("Chưa có dữ liệu trên server. Vui lòng tải lên file Excel.");
+                    setActiveTab('upload');
+                }
+            };
+
+            const handleFileUpload = async (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                setLoading(true);
+                setUploadStatus('Đang tải lên...');
+                
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        setUploadStatus('Tải lên thành công! Đang làm mới dữ liệu...');
+                        // Sau khi upload thành công, gọi lại API lấy dữ liệu mới
+                        await fetchDataFromServer();
+                        setUploadStatus('');
+                    } else {
+                        setUploadStatus('Tải lên thất bại.');
+                        setLoading(false);
+                    }
+                } catch (error) {
+                    setUploadStatus('Lỗi kết nối server.');
+                    setLoading(false);
+                }
+            };
+
+            const stats = useMemo(() => {
+                if (students.length === 0) return null;
+                const classList = [...new Set(students.map(s => s.Lop))].filter(Boolean).sort();
+                
+                const classStats = classList.map(lop => {
+                    const studentsInClass = students.filter(s => s.Lop === lop);
+                    const avgDTB = (studentsInClass.reduce((sum, s) => sum + parseFloat(s.DTB), 0) / studentsInClass.length).toFixed(2);
+                    return { lop, count: studentsInClass.length, avg: avgDTB };
+                });
+
+                const totalAvg = (students.reduce((sum, s) => sum + parseFloat(s.DTB), 0) / students.length).toFixed(2);
+                const excellent = students.filter(s => parseFloat(s.DTB) >= 8).length;
+                const weak = students.filter(s => parseFloat(s.DTB) < 5).length;
+
+                return { classList, classStats, totalAvg, distribution: { excellent, weak } };
+            }, [students]);
+
+            const filteredStudents = useMemo(() => {
+                return students.filter(s => {
+                    const matchesSearch = (s.HoTen?.toLowerCase().includes(searchQuery.toLowerCase())) || (s.SBD?.toString().includes(searchQuery));
+                    const matchesClass = selectedClass === 'All' || s.Lop === selectedClass;
+                    return matchesSearch && matchesClass;
+                });
+            }, [students, searchQuery, selectedClass]);
+
+            const renderDashboard = () => (
+                <div className="space-y-6 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <Card title="Tổng Học Sinh" value={students.length} icon={Icons.Users} colorClass="bg-blue-500 text-blue-500" />
+                        <Card title="Điểm TB Khối" value={stats?.totalAvg || 0} icon={Icons.BookOpen} colorClass="bg-indigo-500 text-indigo-500" />
+                        <Card title="Giỏi (>8.0)" value={stats?.distribution.excellent || 0} icon={Icons.Award} colorClass="bg-emerald-500 text-emerald-500" />
+                        <Card title="Cần Cố Gắng (<5.0)" value={stats?.distribution.weak || 0} icon={Icons.ArrowDown} colorClass="bg-red-500 text-red-500" />
+                    </div>
+                    {/* Biểu đồ */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Icons.BarChart2 className="w-5 h-5 mr-2 text-indigo-600" /> Thống Kê Theo Lớp</h3>
+                        <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                            {stats?.classStats.map((cls) => (
+                                <div key={cls.lop} className="flex items-center text-sm">
+                                    <div className="w-16 font-semibold text-slate-700">{cls.lop}</div>
+                                    <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden mx-2 relative group">
+                                        <div className={`h-full rounded-full ${parseFloat(cls.avg) >= 8 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${(parseFloat(cls.avg) / 10) * 100}%` }}></div>
+                                    </div>
+                                    <div className="w-12 text-right font-bold text-slate-600">{cls.avg}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderSearch = () => (
+                <div className="space-y-4 animate-fade-in">
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-10">
+                        <div className="relative w-full md:w-96">
+                            <Icons.Search className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
+                            <input type="text" placeholder="Tìm tên hoặc SBD..." className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                        </div>
+                        <select className="px-4 py-2 rounded-lg border border-slate-200" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
+                            <option value="All">Tất cả lớp</option>
+                            {stats?.classList.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="overflow-x-auto max-h-[70vh]">
+                            <table className="w-full text-sm text-left text-slate-600">
+                                <thead className="text-xs text-slate-700 uppercase bg-slate-50 border-b sticky top-0 z-10">
+                                    <tr>
+                                        <th className="px-6 py-3 font-bold bg-slate-50 whitespace-nowrap">SBD</th>
+                                        <th className="px-6 py-3 font-bold bg-slate-50 whitespace-nowrap">Họ Tên</th>
+                                        <th className="px-6 py-3 font-bold bg-slate-50 whitespace-nowrap">Lớp</th>
+                                        {subjects.map(sub => <th key={sub} className="px-6 py-3 text-center bg-slate-50 whitespace-nowrap">{sub}</th>)}
+                                        <th className="px-6 py-3 text-center font-bold bg-slate-100 sticky right-0 z-20 whitespace-nowrap">ĐTB</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredStudents.map((s, idx) => (
+                                        <tr key={idx} className="bg-white border-b hover:bg-blue-50">
+                                            <td className="px-6 py-3 font-mono">{s.SBD}</td>
+                                            <td className="px-6 py-3 font-medium">{s.HoTen}</td>
+                                            <td className="px-6 py-3"><span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">{s.Lop}</span></td>
+                                            {subjects.map(sub => (
+                                                <td key={sub} className={`px-6 py-3 text-center ${s._scores[sub] >= 8 ? 'text-emerald-600 font-bold' : s._scores[sub] < 5 && s._scores[sub] !== null ? 'text-red-500' : ''}`}>{s._scores[sub] ?? '-'}</td>
+                                            ))}
+                                            <td className="px-6 py-3 text-center font-bold sticky right-0 bg-slate-50">{s.DTB}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderDataMgmt = () => (
+                <div className="max-w-2xl mx-auto space-y-6 animate-fade-in text-center bg-white p-8 rounded-xl shadow-sm border">
+                    <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Icons.Upload className="w-8 h-8 text-emerald-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800">Cập nhật dữ liệu</h3>
+                    {errorMsg && <p className="text-red-500 bg-red-50 p-2 rounded">{errorMsg}</p>}
+                    {uploadStatus && <p className="text-blue-600 font-medium">{uploadStatus}</p>}
+                    <p className="text-slate-500">Tải lên file Excel (.xlsx) mới để cập nhật dữ liệu cho toàn hệ thống.</p>
+                    <input type="file" accept=".xlsx" onChange={handleFileUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen pb-10">
+                    <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
+                            <h1 className="text-xl font-bold text-slate-800">SmartGrade K12 <span className="text-xs text-blue-500 font-normal border border-blue-200 rounded px-1">Node.js Server</span></h1>
+                            <nav className="flex space-x-2">
+                                {[{id:'dashboard',label:'Tổng Quan',icon:Icons.BarChart2}, {id:'search',label:'Tra Cứu',icon:Icons.Search}, {id:'upload',label:'Dữ Liệu',icon:Icons.Upload}].map(t => (
+                                    <button key={t.id} onClick={() => setActiveTab(t.id)} className={`px-3 py-2 rounded flex items-center text-sm font-medium ${activeTab === t.id ? 'bg-slate-100 text-blue-600' : 'text-slate-500'}`}>
+                                        <t.icon className="w-4 h-4 mr-2" /> {t.label}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                    </header>
+                    {loading && <div className="fixed inset-0 bg-white/80 z-[60] flex items-center justify-center text-blue-600 font-bold">Đang tải dữ liệu từ Server...</div>}
+                    <main className="max-w-7xl mx-auto px-4 py-8">
+                        {activeTab === 'dashboard' && renderDashboard()}
+                        {activeTab === 'search' && renderSearch()}
+                        {activeTab === 'upload' && renderDataMgmt()}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
