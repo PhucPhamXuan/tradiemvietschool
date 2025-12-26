@@ -7,26 +7,25 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Cấu hình upload file - Lưu ngay tại thư mục gốc
+// Cấu hình upload file
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, __dirname); // Lưu vào thư mục hiện tại (root)
+        cb(null, __dirname);
     },
     filename: function (req, file, cb) {
-        cb(null, 'data.xlsx'); // Ghi đè tên file thành data.xlsx
+        cb(null, 'data.xlsx');
     }
 });
 const upload = multer({ storage: storage });
 
-// Middleware
 app.use(express.json());
-// Không dùng express.static('public') nữa vì không còn folder public
 
-// --- HELPER FUNCTIONS ---
+// --- LOGIC MỚI: CHUẨN HÓA VÀ QUÉT CỘT ---
 
 const normalizeHeader = (header) => {
     if (!header) return null;
     const clean = header.toString().trim().toLowerCase();
+    // Logic nhận diện từ khóa (đã bao gồm Sinh, KTPL, GDCD)
     if (clean.includes('toan') || clean.includes('toán')) return 'Toán';
     if (clean.includes('van') || clean.includes('văn')) return 'Văn';
     if (clean.includes('anh') || clean.includes('tiếng anh')) return 'Anh';
@@ -52,59 +51,91 @@ const readExcelData = () => {
         const workbook = xlsx.readFile(filePath);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = xlsx.utils.sheet_to_json(worksheet);
+        
+        // Dùng header: 1 để lấy mảng mảng (array of arrays) thay vì JSON object ngay
+        // Điều này giúp ta lấy được chính xác dòng tiêu đề gốc
+        const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
 
-        if (!jsonData || jsonData.length === 0) return { data: [], headers: [] };
+        if (!rawData || rawData.length < 2) return { data: [], headers: [] };
 
-        const firstRowKeys = Object.keys(jsonData[0]);
-        const subjectMap = {}; 
+        // Dòng 0 là tiêu đề gốc
+        const headerRow = rawData[0]; 
+        
+        // 1. Tạo Map để mapping từ Index cột -> Tên chuẩn hóa (Ví dụ: cột 3 -> 'Toán')
+        const colIndexMap = {}; 
         const subjects = [];
 
-        firstRowKeys.forEach(key => {
-            const norm = normalizeHeader(key);
+        headerRow.forEach((rawHeader, index) => {
+            const norm = normalizeHeader(rawHeader);
             if (norm) {
-                subjectMap[key] = norm;
-                if (!subjects.includes(norm)) subjects.push(norm);
+                colIndexMap[index] = norm; // Lưu lại index của cột môn học
+                if (!subjects.includes(norm)) subjects.push(norm); // Danh sách môn duy nhất
             }
         });
 
-        const processedData = jsonData.map(row => {
+        // 2. Duyệt qua các dòng dữ liệu (từ dòng 1 trở đi)
+        const processedData = [];
+        
+        // Helper tìm index của các cột thông tin (SBD, Tên, Lớp)
+        const findColIndex = (keywords) => {
+            return headerRow.findIndex(h => h && keywords.some(kw => h.toString().toLowerCase().includes(kw)));
+        };
+
+        const idxSBD = findColIndex(['sbd', 'số báo danh', 'so bao danh']);
+        const idxName = findColIndex(['họ tên', 'ho ten', 'hoten', 'tên']);
+        const idxLop = findColIndex(['lớp', 'lop']);
+
+        for (let i = 1; i < rawData.length; i++) {
+            const row = rawData[i];
+            if (!row || row.length === 0) continue;
+
             const scores = {};
             let totalScore = 0;
             let subjectCount = 0;
 
-            const findValue = (keywords) => {
-                const key = firstRowKeys.find(k => keywords.some(kw => k.toLowerCase().includes(kw)));
-                return key ? row[key] : '';
-            };
+            // Lấy điểm dựa trên index đã map
+            subjects.forEach(sub => {
+                // Tìm index cột gốc tương ứng với môn này (trong map)
+                // Lưu ý: Có thể có trường hợp file excel 1 môn có 2 cột (ít gặp), code này lấy cột cuối cùng khớp.
+                // Để chính xác: Duyệt qua keys của colIndexMap
+                scores[sub] = null; // Mặc định là null
+            });
 
-            const sbd = findValue(['sbd', 'số báo danh', 'so bao danh']) || row['SBD'] || '';
-            const name = findValue(['họ tên', 'ho ten', 'hoten', 'tên']) || row['HoTen'] || '';
-            const lop = findValue(['lớp', 'lop']) || row['Lop'] || '';
-
-            Object.keys(subjectMap).forEach(rawKey => {
-                const subjectName = subjectMap[rawKey];
-                const val = row[rawKey];
+            Object.keys(colIndexMap).forEach(colIdx => {
+                const subjectName = colIndexMap[colIdx];
+                const val = row[colIdx];
+                
                 if (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val))) {
                     const numVal = parseFloat(val);
                     scores[subjectName] = numVal;
+                    // Logic tính điểm TB (chỉ tính môn có điểm)
                     totalScore += numVal;
                     subjectCount++;
-                } else {
-                    scores[subjectName] = null;
                 }
             });
 
-            return {
-                SBD: sbd, HoTen: name, Lop: lop, _scores: scores,
-                DTB: subjectCount > 0 ? (totalScore / subjectCount).toFixed(2) : 0
-            };
-        });
+            // Lấy thông tin
+            const sbd = idxSBD !== -1 ? row[idxSBD] : '';
+            const name = idxName !== -1 ? row[idxName] : '';
+            const lop = idxLop !== -1 ? row[idxLop] : '';
+
+            // Chỉ push nếu có thông tin cơ bản
+            if (name || sbd) {
+                processedData.push({
+                    SBD: sbd,
+                    HoTen: name,
+                    Lop: lop,
+                    _scores: scores,
+                    DTB: subjectCount > 0 ? (totalScore / subjectCount).toFixed(2) : 0
+                });
+            }
+        }
 
         return { data: processedData, headers: subjects };
+
     } catch (error) {
         console.error("Lỗi đọc file:", error);
-        return { error: "File data.xlsx bị lỗi format." };
+        return { error: "File data.xlsx bị lỗi format hoặc đang được mở." };
     }
 };
 
@@ -121,7 +152,6 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     res.send('File uploaded successfully');
 });
 
-// Serve Frontend (Trỏ trực tiếp vào file index.html cùng cấp)
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
