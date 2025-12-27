@@ -15,10 +15,17 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Mobile friendly table */
-        .table-container { -webkit-overflow-scrolling: touch; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        /* Mobile specific styles */
+        @media (max-width: 768px) {
+            .mobile-hide { display: none; }
+            .mobile-show { display: table-cell; }
+        }
+        @media (min-width: 769px) {
+            .mobile-hide { display: table-cell; }
+            .mobile-show { display: none; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -37,8 +44,8 @@
             Award: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>,
             Filter: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
             ArrowDown: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><line x1="12" x2="12" y1="5" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
-            Menu: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="18" y2="18"/></svg>,
-            Lock: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Eye: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+            X: (p) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
         };
 
         const Card = ({ title, value, subtext, icon: Icon, colorClass }) => (
@@ -54,40 +61,90 @@
             </div>
         );
 
+        // --- COMPONENT MODAL (POPUP) ---
+        const StudentModal = ({ student, subjects, onClose }) => {
+            if (!student) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="bg-blue-600 p-4 flex justify-between items-start">
+                            <div>
+                                <h3 className="text-xl font-bold text-white">{student.HoTen}</h3>
+                                <p className="text-blue-100 text-sm mt-1">SBD: {student.SBD} | Lớp: {student.Lop}</p>
+                            </div>
+                            <button onClick={onClose} className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/10">
+                                <Icons.X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-4 max-h-[70vh] overflow-y-auto">
+                            <div className="text-center mb-6">
+                                <span className="text-sm text-slate-500 uppercase tracking-wide">Điểm Trung Bình</span>
+                                <div className={`text-4xl font-bold mt-2 ${parseFloat(student.DTB) >= 8 ? 'text-emerald-500' : parseFloat(student.DTB) >= 5 ? 'text-blue-500' : 'text-red-500'}`}>
+                                    {student.DTB}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                {subjects.map(sub => (
+                                    <div key={sub} className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex justify-between items-center">
+                                        <span className="text-slate-600 font-medium text-sm">{sub}</span>
+                                        <span className={`font-bold ${student._scores[sub] >= 8 ? 'text-emerald-600' : student._scores[sub] < 5 && student._scores[sub] !== null ? 'text-red-500' : 'text-slate-800'}`}>
+                                            {student._scores[sub] ?? '-'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 text-center border-t">
+                             <button onClick={onClose} className="w-full py-2 bg-white border border-slate-300 rounded-lg text-slate-600 font-medium hover:bg-slate-50">Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         function App() {
-            const [grade, setGrade] = useState('12'); // State cho khối lớp (10, 11, 12)
+            const [grade, setGrade] = useState('12');
             const [activeTab, setActiveTab] = useState('dashboard');
             const [students, setStudents] = useState([]);
             const [subjects, setSubjects] = useState([]);
             const [searchQuery, setSearchQuery] = useState('');
             const [selectedClass, setSelectedClass] = useState('All');
-            const [statSubject, setStatSubject] = useState('DTB'); // Môn học để xem thống kê
+            const [statSubject, setStatSubject] = useState('DTB');
             const [loading, setLoading] = useState(true);
             const [errorMsg, setErrorMsg] = useState('');
             const [uploadStatus, setUploadStatus] = useState('');
+            
+            // Modal state
+            const [selectedStudent, setSelectedStudent] = useState(null);
 
             useEffect(() => {
-                fetchDataFromServer();
-            }, []);
+                fetchDataFromServer(grade);
+            }, [grade]); // Reload khi đổi khối
 
-            const fetchDataFromServer = async () => {
+            const fetchDataFromServer = async (currentGrade) => {
                 setLoading(true);
                 setErrorMsg('');
                 try {
-                    const response = await fetch('/api/data');
+                    // Gọi API kèm tham số grade
+                    const response = await fetch(`/api/data?grade=${currentGrade}`);
                     const result = await response.json();
 
                     if (response.ok && !result.error) {
                         setStudents(result.data);
                         setSubjects(result.headers);
                         setLoading(false);
-                        if(result.data.length > 0) setActiveTab('dashboard');
+                        // Chỉ về dashboard nếu có data
+                        if(result.data.length > 0 && activeTab === 'upload') setActiveTab('dashboard');
                     } else {
                         throw new Error(result.error || "Lỗi tải dữ liệu");
                     }
                 } catch (err) {
                     setLoading(false);
-                    setErrorMsg("Chưa có dữ liệu trên server. Vui lòng tải lên file Excel.");
+                    setStudents([]); // Reset list nếu lỗi
+                    setErrorMsg(`Chưa có dữ liệu cho khối ${currentGrade}.`);
                     setActiveTab('upload');
                 }
             };
@@ -98,6 +155,8 @@
 
                 const formData = new FormData();
                 formData.append('file', file);
+                formData.append('grade', grade); // Gửi kèm grade để server biết lưu vào đâu
+
                 setLoading(true);
                 setUploadStatus('Đang tải lên...');
                 
@@ -105,7 +164,7 @@
                     const response = await fetch('/api/upload', { method: 'POST', body: formData });
                     if (response.ok) {
                         setUploadStatus('Thành công! Đang xử lý...');
-                        await fetchDataFromServer();
+                        await fetchDataFromServer(grade);
                         setUploadStatus('');
                     } else {
                         setUploadStatus('Thất bại.');
@@ -117,16 +176,20 @@
                 }
             };
 
-            // Thống kê nâng cao
+            const filteredStudents = useMemo(() => {
+                return students.filter(s => {
+                    const matchesSearch = (s.HoTen?.toLowerCase().includes(searchQuery.toLowerCase())) || (s.SBD?.toString().includes(searchQuery));
+                    const matchesClass = selectedClass === 'All' || s.Lop === selectedClass;
+                    return matchesSearch && matchesClass;
+                });
+            }, [students, searchQuery, selectedClass]);
+
             const stats = useMemo(() => {
                 if (students.length === 0) return null;
                 const classList = [...new Set(students.map(s => s.Lop))].filter(Boolean).sort();
                 
-                // Thống kê theo lớp (Dynamic cho từng môn)
                 const classStats = classList.map(lop => {
                     const studentsInClass = students.filter(s => s.Lop === lop);
-                    
-                    // Tính TB của môn đang chọn (hoặc ĐTB chung)
                     let totalVal = 0;
                     let countVal = 0;
 
@@ -137,7 +200,6 @@
                             countVal++;
                             totalVal += val;
                         } else {
-                            // Chỉ tính những em có điểm môn đó
                             const score = s._scores[statSubject];
                             if (score !== null && score !== undefined) {
                                 val = parseFloat(score);
@@ -158,57 +220,42 @@
                 return { classList, classStats, totalAvg, distribution: { excellent, weak } };
             }, [students, statSubject]);
 
-            const filteredStudents = useMemo(() => {
-                return students.filter(s => {
-                    const matchesSearch = (s.HoTen?.toLowerCase().includes(searchQuery.toLowerCase())) || (s.SBD?.toString().includes(searchQuery));
-                    const matchesClass = selectedClass === 'All' || s.Lop === selectedClass;
-                    return matchesSearch && matchesClass;
-                });
-            }, [students, searchQuery, selectedClass]);
+            // --- RENDERERS ---
 
             const renderGradeSelector = () => (
                 <div className="flex space-x-1 bg-slate-200 p-1 rounded-lg mb-6 max-w-md mx-auto sm:mx-0">
-                    <button 
-                        onClick={() => setGrade('12')} 
-                        className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${grade === '12' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        Khối 12
-                    </button>
-                    <button disabled className="flex-1 py-1.5 px-3 rounded-md text-sm font-medium text-slate-400 flex items-center justify-center cursor-not-allowed">
-                        Khối 11 <Icons.Lock className="w-3 h-3 ml-1"/>
-                    </button>
-                    <button disabled className="flex-1 py-1.5 px-3 rounded-md text-sm font-medium text-slate-400 flex items-center justify-center cursor-not-allowed">
-                        Khối 10 <Icons.Lock className="w-3 h-3 ml-1"/>
-                    </button>
+                    {['12', '11', '10'].map(g => (
+                         <button 
+                            key={g}
+                            onClick={() => setGrade(g)} 
+                            className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${grade === g ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Khối {g}
+                        </button>
+                    ))}
                 </div>
             );
 
             const renderDashboard = () => (
                 <div className="space-y-6 animate-fade-in">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <Card title="Tổng Học Sinh" value={students.length} icon={Icons.Users} colorClass="bg-blue-500 text-blue-500" />
+                        <Card title={`Học Sinh Khối ${grade}`} value={students.length} icon={Icons.Users} colorClass="bg-blue-500 text-blue-500" />
                         <Card title="Điểm TB Khối" value={stats?.totalAvg || 0} icon={Icons.BookOpen} colorClass="bg-indigo-500 text-indigo-500" />
                         <Card title="Giỏi (>8.0)" value={stats?.distribution.excellent || 0} icon={Icons.Award} colorClass="bg-emerald-500 text-emerald-500" />
                         <Card title="Cần Cố Gắng (<5.0)" value={stats?.distribution.weak || 0} icon={Icons.ArrowDown} colorClass="bg-red-500 text-red-500" />
                     </div>
 
-                    {/* Biểu đồ nâng cao */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                             <h3 className="text-lg font-bold text-slate-800 flex items-center">
                                 <Icons.BarChart2 className="w-5 h-5 mr-2 text-indigo-600" /> 
                                 So Sánh: <span className="text-indigo-600 ml-1">{statSubject === 'DTB' ? 'Điểm TB Chung' : `Môn ${statSubject}`}</span>
                             </h3>
-                            <select 
-                                value={statSubject} 
-                                onChange={(e) => setStatSubject(e.target.value)}
-                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
-                            >
+                            <select value={statSubject} onChange={(e) => setStatSubject(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2">
                                 <option value="DTB">Điểm Trung Bình (Chung)</option>
                                 {subjects.map(s => <option key={s} value={s}>Môn {s}</option>)}
                             </select>
                         </div>
-                        
                         <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                             {stats?.classStats.map((cls) => (
                                 <div key={cls.lop} className="flex items-center text-sm">
@@ -246,27 +293,44 @@
                             <table className="w-full text-sm text-left text-slate-600">
                                 <thead className="text-xs text-slate-700 uppercase bg-slate-50 border-b sticky top-0 z-10">
                                     <tr>
+                                        {/* Cột Chi tiết cho Mobile */}
+                                        <th className="px-4 py-3 bg-slate-50 font-bold text-center w-12 mobile-show">Xem</th>
+                                        
                                         <th className="px-4 py-3 font-bold bg-slate-50 whitespace-nowrap min-w-[80px]">SBD</th>
                                         <th className="px-4 py-3 font-bold bg-slate-50 whitespace-nowrap min-w-[150px] sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Họ Tên</th>
                                         <th className="px-4 py-3 font-bold bg-slate-50 whitespace-nowrap">Lớp</th>
-                                        {subjects.map(sub => <th key={sub} className="px-4 py-3 text-center bg-slate-50 whitespace-nowrap min-w-[60px]">{sub}</th>)}
+                                        
+                                        {/* Các môn học: Ẩn trên Mobile */}
+                                        {subjects.map(sub => <th key={sub} className="px-4 py-3 text-center bg-slate-50 whitespace-nowrap min-w-[60px] mobile-hide">{sub}</th>)}
+                                        
                                         <th className="px-4 py-3 text-center font-bold bg-slate-100 sticky right-0 z-20 whitespace-nowrap shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]">ĐTB</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredStudents.map((s, idx) => (
+                                    {filteredStudents.length > 0 ? filteredStudents.map((s, idx) => (
                                         <tr key={idx} className="bg-white border-b hover:bg-blue-50">
+                                            {/* Nút Xem trên Mobile */}
+                                            <td className="px-2 py-3 text-center mobile-show">
+                                                <button onClick={() => setSelectedStudent(s)} className="text-blue-600 bg-blue-50 p-2 rounded-full hover:bg-blue-100">
+                                                    <Icons.Eye className="w-4 h-4"/>
+                                                </button>
+                                            </td>
+
                                             <td className="px-4 py-3 font-mono">{s.SBD}</td>
                                             <td className="px-4 py-3 font-medium sticky left-0 bg-white hover:bg-blue-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{s.HoTen}</td>
                                             <td className="px-4 py-3"><span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">{s.Lop}</span></td>
+                                            
+                                            {/* Điểm số: Ẩn trên Mobile */}
                                             {subjects.map(sub => (
-                                                <td key={sub} className={`px-4 py-3 text-center ${s._scores[sub] >= 8 ? 'text-emerald-600 font-bold' : s._scores[sub] < 5 && s._scores[sub] !== null ? 'text-red-500' : 'text-slate-500'}`}>
+                                                <td key={sub} className={`px-4 py-3 text-center mobile-hide ${s._scores[sub] >= 8 ? 'text-emerald-600 font-bold' : s._scores[sub] < 5 && s._scores[sub] !== null ? 'text-red-500' : 'text-slate-500'}`}>
                                                     {s._scores[sub] ?? <span className="text-slate-200">-</span>}
                                                 </td>
                                             ))}
                                             <td className="px-4 py-3 text-center font-bold sticky right-0 bg-slate-50 z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]">{s.DTB}</td>
                                         </tr>
-                                    ))}
+                                    )) : (
+                                        <tr><td colSpan={subjects.length + 5} className="text-center py-8 text-slate-400">Không có dữ liệu</td></tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -280,41 +344,22 @@
                     <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Icons.Upload className="w-8 h-8 text-emerald-500" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800">Cập nhật dữ liệu</h3>
+                    <h3 className="text-xl font-bold text-slate-800">Cập nhật dữ liệu Khối {grade}</h3>
                     {errorMsg && <p className="text-red-500 bg-red-50 p-2 rounded">{errorMsg}</p>}
                     {uploadStatus && <p className="text-blue-600 font-medium">{uploadStatus}</p>}
-                    <p className="text-slate-500 mb-4">Tải lên file Excel (.xlsx) để hệ thống tự động nhận diện tất cả các môn.</p>
+                    <p className="text-slate-500 mb-4">Tải file <strong>.xlsx</strong> cho <strong className="text-slate-800">Khối {grade}</strong> tại đây.</p>
                     <label className="block w-full cursor-pointer">
                         <input type="file" accept=".xlsx" onChange={handleFileUpload} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
                     </label>
                 </div>
             );
 
-            // Giao diện Khối 10, 11 (Bảo trì)
-            if (grade === '10' || grade === '11') {
-                return (
-                    <div className="min-h-screen pb-10">
-                        <header className="bg-white shadow-sm border-b sticky top-0 z-50 h-16 flex items-center px-4">
-                             <h1 className="text-xl font-bold text-slate-800">SmartGrade K12</h1>
-                        </header>
-                        <main className="max-w-7xl mx-auto px-4 py-8">
-                            {renderGradeSelector()}
-                            <div className="text-center py-20 text-slate-400">
-                                <Icons.Lock className="w-16 h-16 mx-auto mb-4 opacity-50"/>
-                                <h3 className="text-xl font-bold text-slate-600">Đang cập nhật</h3>
-                                <p>Dữ liệu cho khối {grade} đang được xây dựng.</p>
-                            </div>
-                        </main>
-                    </div>
-                )
-            }
-
             return (
                 <div className="min-h-screen pb-20 md:pb-10">
                     <header className="bg-white shadow-sm border-b sticky top-0 z-50">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
                             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                SmartGrade K12 <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded">Beta</span>
+                                SmartGrade K12 <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded">Khối {grade}</span>
                             </h1>
                             <nav className="hidden md:flex space-x-2">
                                 {[{id:'dashboard',label:'Tổng Quan',icon:Icons.BarChart2}, {id:'search',label:'Tra Cứu',icon:Icons.Search}, {id:'upload',label:'Dữ Liệu',icon:Icons.Upload}].map(t => (
@@ -325,9 +370,10 @@
                             </nav>
                         </div>
                     </header>
+                    
                     {loading && <div className="fixed inset-0 bg-white/90 z-[60] flex items-center justify-center flex-col">
                         <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
-                        <p className="text-blue-600 font-medium animate-pulse">Đang tải dữ liệu...</p>
+                        <p className="text-blue-600 font-medium animate-pulse">Đang tải dữ liệu Khối {grade}...</p>
                     </div>}
                     
                     <main className="max-w-7xl mx-auto px-4 py-6">
@@ -346,6 +392,13 @@
                             </button>
                         ))}
                     </div>
+
+                    {/* Student Detail Modal */}
+                    <StudentModal 
+                        student={selectedStudent} 
+                        subjects={subjects} 
+                        onClose={() => setSelectedStudent(null)} 
+                    />
                 </div>
             );
         }
