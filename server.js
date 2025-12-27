@@ -7,13 +7,22 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Cấu hình upload file
+// Helper: Lấy tên file dựa trên khối
+const getFileNameByGrade = (grade) => {
+    if (grade == 11) return 'data1.xlsx';
+    if (grade == 10) return 'data0.xlsx';
+    return 'data.xlsx'; // Mặc định khối 12
+};
+
+// Cấu hình upload file - Lưu ngay tại thư mục gốc với tên file động
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, __dirname);
     },
     filename: function (req, file, cb) {
-        cb(null, 'data.xlsx');
+        // Lấy grade từ body req (được gửi kèm file)
+        const grade = req.body.grade || '12';
+        cb(null, getFileNameByGrade(grade));
     }
 });
 const upload = multer({ storage: storage });
@@ -25,7 +34,6 @@ app.use(express.json());
 const normalizeHeader = (header) => {
     if (!header) return null;
     const clean = header.toString().trim().toLowerCase();
-    // Logic nhận diện từ khóa (đã bao gồm Sinh, KTPL, GDCD)
     if (clean.includes('toan') || clean.includes('toán')) return 'Toán';
     if (clean.includes('van') || clean.includes('văn')) return 'Văn';
     if (clean.includes('anh') || clean.includes('tiếng anh')) return 'Anh';
@@ -40,11 +48,12 @@ const normalizeHeader = (header) => {
     return null;
 };
 
-const readExcelData = () => {
-    const filePath = path.join(__dirname, 'data.xlsx');
+const readExcelData = (grade) => {
+    const fileName = getFileNameByGrade(grade);
+    const filePath = path.join(__dirname, fileName);
     
     if (!fs.existsSync(filePath)) {
-        return { error: "Chưa có file dữ liệu (data.xlsx)" };
+        return { error: `Chưa có file dữ liệu cho khối ${grade} (${fileName})` };
     }
 
     try {
@@ -52,31 +61,24 @@ const readExcelData = () => {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        // Dùng header: 1 để lấy mảng mảng (array of arrays) thay vì JSON object ngay
-        // Điều này giúp ta lấy được chính xác dòng tiêu đề gốc
         const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
 
         if (!rawData || rawData.length < 2) return { data: [], headers: [] };
 
-        // Dòng 0 là tiêu đề gốc
         const headerRow = rawData[0]; 
-        
-        // 1. Tạo Map để mapping từ Index cột -> Tên chuẩn hóa (Ví dụ: cột 3 -> 'Toán')
         const colIndexMap = {}; 
         const subjects = [];
 
         headerRow.forEach((rawHeader, index) => {
             const norm = normalizeHeader(rawHeader);
             if (norm) {
-                colIndexMap[index] = norm; // Lưu lại index của cột môn học
-                if (!subjects.includes(norm)) subjects.push(norm); // Danh sách môn duy nhất
+                colIndexMap[index] = norm;
+                if (!subjects.includes(norm)) subjects.push(norm);
             }
         });
 
-        // 2. Duyệt qua các dòng dữ liệu (từ dòng 1 trở đi)
         const processedData = [];
         
-        // Helper tìm index của các cột thông tin (SBD, Tên, Lớp)
         const findColIndex = (keywords) => {
             return headerRow.findIndex(h => h && keywords.some(kw => h.toString().toLowerCase().includes(kw)));
         };
@@ -93,13 +95,7 @@ const readExcelData = () => {
             let totalScore = 0;
             let subjectCount = 0;
 
-            // Lấy điểm dựa trên index đã map
-            subjects.forEach(sub => {
-                // Tìm index cột gốc tương ứng với môn này (trong map)
-                // Lưu ý: Có thể có trường hợp file excel 1 môn có 2 cột (ít gặp), code này lấy cột cuối cùng khớp.
-                // Để chính xác: Duyệt qua keys của colIndexMap
-                scores[sub] = null; // Mặc định là null
-            });
+            subjects.forEach(sub => scores[sub] = null);
 
             Object.keys(colIndexMap).forEach(colIdx => {
                 const subjectName = colIndexMap[colIdx];
@@ -108,18 +104,15 @@ const readExcelData = () => {
                 if (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val))) {
                     const numVal = parseFloat(val);
                     scores[subjectName] = numVal;
-                    // Logic tính điểm TB (chỉ tính môn có điểm)
                     totalScore += numVal;
                     subjectCount++;
                 }
             });
 
-            // Lấy thông tin
             const sbd = idxSBD !== -1 ? row[idxSBD] : '';
             const name = idxName !== -1 ? row[idxName] : '';
             const lop = idxLop !== -1 ? row[idxLop] : '';
 
-            // Chỉ push nếu có thông tin cơ bản
             if (name || sbd) {
                 processedData.push({
                     SBD: sbd,
@@ -135,18 +128,21 @@ const readExcelData = () => {
 
     } catch (error) {
         console.error("Lỗi đọc file:", error);
-        return { error: "File data.xlsx bị lỗi format hoặc đang được mở." };
+        return { error: "File bị lỗi format hoặc đang được mở." };
     }
 };
 
 // --- API ENDPOINTS ---
 
+// API lấy dữ liệu theo khối
 app.get('/api/data', (req, res) => {
-    const result = readExcelData();
+    const grade = req.query.grade || '12'; // Lấy param grade
+    const result = readExcelData(grade);
     if (result.error) return res.status(404).json(result);
     res.json(result);
 });
 
+// API Upload file theo khối
 app.post('/api/upload', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).send('Không có file.');
     res.send('File uploaded successfully');
