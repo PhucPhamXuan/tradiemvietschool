@@ -1,5 +1,4 @@
 const express = require('express');
-const multer = require('multer');
 const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
@@ -13,19 +12,6 @@ const getFileNameByGrade = (grade) => {
     if (grade == 10) return 'data0.xlsx';
     return 'data.xlsx'; // Mặc định khối 12
 };
-
-// Cấu hình upload file - Lưu ngay tại thư mục gốc với tên file động
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, __dirname);
-    },
-    filename: function (req, file, cb) {
-        // Lấy grade từ body req (được gửi kèm file)
-        const grade = req.body.grade || '12';
-        cb(null, getFileNameByGrade(grade));
-    }
-});
-const upload = multer({ storage: storage });
 
 app.use(express.json());
 
@@ -53,7 +39,7 @@ const readExcelData = (grade) => {
     const filePath = path.join(__dirname, fileName);
     
     if (!fs.existsSync(filePath)) {
-        return { error: `Chưa có file dữ liệu cho khối ${grade} (${fileName})` };
+        return { error: `Chưa có file dữ liệu cho khối ${grade} (${fileName}) trên hệ thống.` };
     }
 
     try {
@@ -128,7 +114,7 @@ const readExcelData = (grade) => {
 
     } catch (error) {
         console.error("Lỗi đọc file:", error);
-        return { error: "File bị lỗi format hoặc đang được mở." };
+        return { error: "File hệ thống bị lỗi format." };
     }
 };
 
@@ -142,11 +128,7 @@ app.get('/api/data', (req, res) => {
     res.json(result);
 });
 
-// API Upload file theo khối
-app.post('/api/upload', upload.single('file'), (req, res) => {
-    if (!req.file) return res.status(400).send('Không có file.');
-    res.send('File uploaded successfully');
-});
+// ĐÃ XÓA API POST /api/upload
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
